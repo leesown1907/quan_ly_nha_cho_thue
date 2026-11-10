@@ -33,49 +33,14 @@ f:\project
 └── package.json
 ```
 
-## 3. Hướng dẫn cài đặt và chạy
-
-### Yêu cầu
-- Cài đặt **Node.js >= 20** (tải tại https://nodejs.org).
-- **PostgreSQL** là tùy chọn:
-  - Nếu chưa cài PostgreSQL, hệ thống tự động dùng **PostgreSQL nhúng (PGlite)** và lưu dữ liệu tại `backend/data/pgdata`, tự khởi tạo bảng và dữ liệu mẫu ngay lần chạy đầu tiên.
-  - Nếu dùng PostgreSQL Server, sao chép `backend/.env.example` thành `backend/.env` và điền `DATABASE_URL=postgresql://user:pass@localhost:5432/ten_db`.
-
-### Cài đặt thư viện
-```powershell
-npm run install:all
-```
-
-### Chạy môi trường phát triển (2 cửa sổ terminal)
-```powershell
-# Terminal 1 — Backend API (http://localhost:5000)
-npm run dev:backend
-
-# Terminal 2 — Frontend Vite (http://localhost:5173)
-npm run dev:frontend
-```
-Mở trình duyệt tại **http://localhost:5173**.
-
-### Hoặc đóng gói và chạy trên 1 cổng duy nhất
-```powershell
-npm run build
-npm start
-# Truy cập http://localhost:5000
-```
-
-### Đặt lại dữ liệu mẫu ban đầu
-```powershell
-npm run db:reset
-```
-
-## 4. Tài khoản dùng thử (được tạo sẵn)
+## 3. Tài khoản dùng thử (được tạo sẵn)
 
 | Vai trò | Tên đăng nhập | Mật khẩu | Ghi chú |
 | --- | --- | --- | --- |
 | Chủ nhà / Quản lý | `admin` | `admin123` | Toàn quyền quản lý |
 | Người thuê | `tenant01` .. `tenant10` | `123456` | Đang thuê các phòng P101..P401 |
 
-## 5. Đáp ứng yêu cầu chức năng (FR01 – FR32)
+## 4. Đáp ứng yêu cầu chức năng (FR01 – FR32)
 
 - **Đăng nhập & Phân quyền (FR01–FR04):** Đăng nhập, đăng xuất (hủy hiệu lực token), đổi mật khẩu, cấp tài khoản, khóa tài khoản, phân quyền Chủ nhà / Người thuê (trả về HTTP 403 nếu truy cập trái quyền).
 - **Quản lý phòng (FR05–FR09):** Thêm/sửa/xóa phòng, 3 trạng thái (*Phòng trống, Đang cho thuê, Đang sửa chữa*), tự đồng bộ trạng thái theo hợp đồng, chặn xóa phòng đang thuê hoặc đã có lịch sử.
