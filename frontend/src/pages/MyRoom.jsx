@@ -1,14 +1,17 @@
-import { DoorOpen, FileText } from 'lucide-react';
+import { useState } from 'react';
+import { DoorOpen, Eye, FileText } from 'lucide-react';
 import { api } from '../api';
 import { useApi } from '../hooks/useApi';
 import { CONTRACT_STATUS, date, money, ROOM_STATUS } from '../utils/format';
 import {
-  Badge, Card, EmptyState, ErrorBox, InfoRow, PageHeader, Spinner, StatusBadge,
+  Badge, Button, Card, EmptyState, ErrorBox, IconButton, InfoRow, PageHeader, Spinner, StatusBadge,
 } from '../components/ui';
+import ContractWordModal from '../components/ContractWordModal';
 
 export default function MyRoom() {
   const { data: rooms, loading: l1, error: e1, reload } = useApi(() => api.get('/rooms'), []);
   const { data: contracts, loading: l2 } = useApi(() => api.get('/contracts'), []);
+  const [viewContract, setViewContract] = useState(null);
 
   if (l1 || l2) return <Spinner />;
   if (e1) return <ErrorBox error={e1} onRetry={reload} />;
@@ -44,7 +47,14 @@ export default function MyRoom() {
           )}
 
           {activeContract && (
-            <Card title={`Hợp đồng đang hiệu lực (${activeContract.code})`}>
+            <Card
+              title={`Hợp đồng đang hiệu lực (${activeContract.code})`}
+              actions={(
+                <Button size="sm" variant="soft" icon={FileText} onClick={() => setViewContract(activeContract)}>
+                  Xem bản Word
+                </Button>
+              )}
+            >
               <InfoRow label="Mã hợp đồng">{activeContract.code}</InfoRow>
               <InfoRow label="Trạng thái"><StatusBadge map={CONTRACT_STATUS} value={activeContract.status} /></InfoRow>
               <InfoRow label="Ngày bắt đầu">{date(activeContract.start_date)}</InfoRow>
@@ -73,7 +83,7 @@ export default function MyRoom() {
           <div className="table-wrap">
             <table className="table">
               <thead>
-                <tr><th>Mã HĐ</th><th>Phòng</th><th>Bắt đầu</th><th>Kết thúc</th><th>Giá thuê</th><th>Tiền cọc</th><th>Trạng thái</th></tr>
+                <tr><th>Mã HĐ</th><th>Phòng</th><th>Bắt đầu</th><th>Kết thúc</th><th>Giá thuê</th><th>Tiền cọc</th><th>Trạng thái</th><th className="text-right">Bản Word</th></tr>
               </thead>
               <tbody>
                 {contracts.map((c) => (
@@ -85,12 +95,24 @@ export default function MyRoom() {
                     <td>{money(c.monthly_rent)}</td>
                     <td>{money(c.deposit)}</td>
                     <td><StatusBadge map={CONTRACT_STATUS} value={c.status} /></td>
+                    <td className="text-right">
+                      <IconButton icon={Eye} title="Xem hợp đồng (Bản Word)" onClick={() => setViewContract(c)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </Card>
+      )}
+
+      {viewContract && (
+        <ContractWordModal
+          contract={viewContract}
+          initialMode="view"
+          canEdit={false}
+          onClose={() => setViewContract(null)}
+        />
       )}
     </div>
   );

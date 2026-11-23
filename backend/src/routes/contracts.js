@@ -10,6 +10,7 @@ r.use(authenticate);
 const CONTRACT_SELECT = `
   SELECT c.*, r.code AS room_code, r.area AS room_area, r.floor AS room_floor,
          t.full_name AS tenant_name, t.phone AS tenant_phone, t.id_card AS tenant_id_card,
+         t.hometown AS tenant_hometown, t.birth_date AS tenant_birth_date,
          (c.end_date - CURRENT_DATE) AS days_left
   FROM contracts c
   JOIN rooms r ON r.id = c.room_id

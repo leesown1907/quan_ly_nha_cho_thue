@@ -617,6 +617,7 @@ const TENANT_SELECT = `
 const CONTRACT_SELECT = `
   SELECT c.*, r.code AS room_code, r.area AS room_area, r.floor AS room_floor,
          t.full_name AS tenant_name, t.phone AS tenant_phone, t.id_card AS tenant_id_card,
+         t.hometown AS tenant_hometown, t.birth_date AS tenant_birth_date,
          (c.end_date - CURRENT_DATE) AS days_left
   FROM contracts c
   JOIN rooms r ON r.id = c.room_id
@@ -888,16 +889,38 @@ export async function handleLocalApi(path, { method = 'GET', body = {}, params: 
   if (method === 'PUT' && (m = matchRoute('/contracts/:id', pathname))) {
     requireAdmin();
     const id = Number(m.id);
+    const cur = (await db.query('SELECT * FROM contracts WHERE id = $1', [id])).rows[0];
+    if (!cur) throw new HttpError(404, 'Không tìm thấy hợp đồng');
+    if (cur.status !== 'active') throw new HttpError(409, 'Chỉ có thể sửa hợp đồng đang hiệu lực');
+    const endDate = body.end_date || cur.end_date;
+    if (!isDate(endDate) || endDate <= cur.start_date) throw new HttpError(400, 'Ngày kết thúc phải sau ngày bắt đầu');
     await db.query(
-      `UPDATE contracts SET end_date = $1, monthly_rent = $2, deposit = $3, occupants = $4, terms = $5 WHERE id = $6`,
-      [body.end_date, num(body.monthly_rent, 'Giá thuê'), num(body.deposit, 'Tiền cọc'), num(body.occupants, 'Số người'), str(body.terms), id],
+      `UPDATE contracts SET end_date = $1, monthly_rent = $2, deposit = $3, payment_day = $4, occupants = $5, terms = $6 WHERE id = $7`,
+      [
+        endDate,
+        num(body.monthly_rent ?? cur.monthly_rent, 'Giá thuê'),
+        num(body.deposit ?? cur.deposit, 'Tiền cọc'),
+        num(body.payment_day ?? cur.payment_day, 'Ngày thanh toán', { min: 1, max: 28 }),
+        num(body.occupants ?? cur.occupants, 'Số người ở', { min: 1 }),
+        body.terms !== undefined ? str(body.terms) : cur.terms,
+        id,
+      ],
     );
     return (await db.query(`${CONTRACT_SELECT} WHERE c.id = $1`, [id])).rows[0];
   }
   if (method === 'POST' && (m = matchRoute('/contracts/:id/extend', pathname))) {
     requireAdmin();
     const id = Number(m.id);
-    await db.query('UPDATE contracts SET end_date = $1, monthly_rent = $2 WHERE id = $3', [body.end_date, num(body.monthly_rent, 'Giá thuê'), id]);
+    const cur = (await db.query('SELECT * FROM contracts WHERE id = $1', [id])).rows[0];
+    if (!cur) throw new HttpError(404, 'Không tìm thấy hợp đồng');
+    if (cur.status !== 'active') throw new HttpError(409, 'Chỉ có thể gia hạn hợp đồng đang hiệu lực');
+    if (!isDate(body.end_date) || body.end_date <= cur.end_date) {
+      throw new HttpError(400, 'Ngày gia hạn phải sau ngày kết thúc hiện tại');
+    }
+    const rent = body.monthly_rent !== undefined && body.monthly_rent !== ''
+      ? num(body.monthly_rent, 'Giá thuê')
+      : cur.monthly_rent;
+    await db.query('UPDATE contracts SET end_date = $1, monthly_rent = $2 WHERE id = $3', [body.end_date, rent, id]);
     return (await db.query(`${CONTRACT_SELECT} WHERE c.id = $1`, [id])).rows[0];
   }
   if (method === 'POST' && (m = matchRoute('/contracts/:id/terminate', pathname))) {

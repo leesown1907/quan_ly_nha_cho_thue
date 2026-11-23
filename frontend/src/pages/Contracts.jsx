@@ -5,9 +5,10 @@ import { useFeedback } from '../context/FeedbackContext';
 import { useApi, useDebounce } from '../hooks/useApi';
 import { addMonths, CONTRACT_STATUS, date, money, today } from '../utils/format';
 import {
-  Badge, Button, Card, EmptyState, ErrorBox, IconButton, InfoRow, Input, Modal, PageHeader,
+  Badge, Button, Card, EmptyState, ErrorBox, IconButton, Input, Modal, PageHeader,
   SearchInput, Select, Spinner, StatusBadge, Textarea,
 } from '../components/ui';
+import ContractWordModal from '../components/ContractWordModal';
 
 export default function Contracts() {
   const { toast } = useFeedback();
@@ -21,10 +22,7 @@ export default function Contracts() {
   );
 
   const [createModal, setCreateModal] = useState(null);
-  const [editModal, setEditModal] = useState(null);
-  const [extendModal, setExtendModal] = useState(null);
-  const [termModal, setTermModal] = useState(null);
-  const [detail, setDetail] = useState(null);
+  const [wordModal, setWordModal] = useState(null); // { contract, mode: 'view' | 'edit' | 'extend' | 'terminate' }
   const [saving, setSaving] = useState(false);
 
   const openCreate = async () => {
@@ -67,61 +65,11 @@ export default function Contracts() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post('/contracts', createModal);
+      const created = await api.post('/contracts', createModal);
       toast('Đã lập hợp đồng & chuyển phòng sang trạng thái "Đang cho thuê"');
       setCreateModal(null);
       reload();
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitEdit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.put(`/contracts/${editModal.id}`, editModal);
-      toast('Đã cập nhật hợp đồng');
-      setEditModal(null);
-      reload();
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitExtend = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post(`/contracts/${extendModal.id}/extend`, {
-        end_date: extendModal.end_date,
-        monthly_rent: extendModal.monthly_rent,
-      });
-      toast('Đã gia hạn hợp đồng');
-      setExtendModal(null);
-      reload();
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitTerminate = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post(`/contracts/${termModal.id}/terminate`, {
-        ended_at: termModal.ended_at,
-        end_reason: termModal.end_reason,
-      });
-      toast('Đã thanh lý hợp đồng & chuyển phòng về "Phòng trống"');
-      setTermModal(null);
-      reload();
+      if (created) setWordModal({ contract: created, mode: 'view' });
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -133,7 +81,7 @@ export default function Contracts() {
     <div>
       <PageHeader
         title="Quản lý hợp đồng thuê phòng"
-        subtitle="Lập hợp đồng mới, cập nhật điều khoản, gia hạn hoặc thanh lý hợp đồng"
+        subtitle="Xem bản hợp đồng Word, chỉnh sửa trực tiếp điều khoản, gia hạn hoặc lập biên bản thanh lý"
         actions={<Button icon={Plus} onClick={openCreate}>Lập hợp đồng mới</Button>}
       />
 
@@ -187,21 +135,29 @@ export default function Contracts() {
                     <td>{money(c.deposit)}</td>
                     <td><StatusBadge map={CONTRACT_STATUS} value={c.status} /></td>
                     <td className="text-right">
-                      <IconButton icon={Eye} title="Xem hợp đồng" onClick={() => setDetail(c)} />
+                      <IconButton
+                        icon={Eye}
+                        title="Xem hợp đồng (Bản Word)"
+                        onClick={() => setWordModal({ contract: c, mode: 'view' })}
+                      />
                       {c.status === 'active' && (
                         <>
-                          <IconButton icon={Edit3} title="Sửa điều khoản" onClick={() => setEditModal({ ...c })} />
+                          <IconButton
+                            icon={Edit3}
+                            title="Cập nhật trực tiếp trên bản Word"
+                            onClick={() => setWordModal({ contract: c, mode: 'edit' })}
+                          />
                           <IconButton
                             icon={CalendarPlus}
                             variant="brand"
-                            title="Gia hạn hợp đồng"
-                            onClick={() => setExtendModal({ ...c, end_date: addMonths(c.end_date, 6) })}
+                            title="Gia hạn trên bản Word"
+                            onClick={() => setWordModal({ contract: c, mode: 'extend' })}
                           />
                           <IconButton
                             icon={XOctagon}
                             variant="danger"
-                            title="Kết thúc / Thanh lý"
-                            onClick={() => setTermModal({ ...c, ended_at: today(), end_reason: '' })}
+                            title="Kết thúc / Thanh lý trên bản Word"
+                            onClick={() => setWordModal({ contract: c, mode: 'terminate' })}
                           />
                         </>
                       )}
@@ -214,7 +170,7 @@ export default function Contracts() {
         )}
       </Card>
 
-      {/* Lập hợp đồng */}
+      {/* Lập hợp đồng mới */}
       <Modal open={!!createModal} onClose={() => setCreateModal(null)} title="Lập hợp đồng thuê phòng mới" size="lg">
         {createModal && (createModal.rooms.length === 0 ? (
           <p className="text-sm text-slate-600">Hiện không có phòng trống để lập hợp đồng mới.</p>
@@ -247,83 +203,16 @@ export default function Contracts() {
         ))}
       </Modal>
 
-      {/* Sửa hợp đồng */}
-      <Modal open={!!editModal} onClose={() => setEditModal(null)} title={editModal ? `Cập nhật hợp đồng ${editModal.code}` : ''}>
-        {editModal && (
-          <form onSubmit={submitEdit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Ngày kết thúc" type="date" required value={editModal.end_date} onChange={(e) => setEditModal({ ...editModal, end_date: e.target.value })} />
-              <Input label="Giá thuê (đ/tháng)" type="number" step="50000" required value={editModal.monthly_rent} onChange={(e) => setEditModal({ ...editModal, monthly_rent: e.target.value })} />
-              <Input label="Tiền cọc (đ)" type="number" step="50000" required value={editModal.deposit} onChange={(e) => setEditModal({ ...editModal, deposit: e.target.value })} />
-              <Input label="Số người ở" type="number" min="1" required value={editModal.occupants} onChange={(e) => setEditModal({ ...editModal, occupants: e.target.value })} />
-            </div>
-            <Textarea label="Điều khoản" value={editModal.terms || ''} onChange={(e) => setEditModal({ ...editModal, terms: e.target.value })} />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setEditModal(null)}>Hủy</Button>
-              <Button type="submit" loading={saving}>Lưu thay đổi</Button>
-            </div>
-          </form>
-        )}
-      </Modal>
-
-      {/* Gia hạn */}
-      <Modal open={!!extendModal} onClose={() => setExtendModal(null)} title={extendModal ? `Gia hạn hợp đồng ${extendModal.code}` : ''} size="sm">
-        {extendModal && (
-          <form onSubmit={submitExtend} className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Phòng <strong>{extendModal.room_code}</strong> — {extendModal.tenant_name}. Hạn hiện tại: <strong>{date(extendModal.end_date)}</strong>.
-            </p>
-            <Input label="Gia hạn đến ngày" type="date" required value={extendModal.end_date} onChange={(e) => setExtendModal({ ...extendModal, end_date: e.target.value })} />
-            <Input label="Giá thuê áp dụng (đ/tháng)" type="number" step="50000" required value={extendModal.monthly_rent} onChange={(e) => setExtendModal({ ...extendModal, monthly_rent: e.target.value })} />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setExtendModal(null)}>Hủy</Button>
-              <Button type="submit" loading={saving}>Xác nhận gia hạn</Button>
-            </div>
-          </form>
-        )}
-      </Modal>
-
-      {/* Kết thúc */}
-      <Modal open={!!termModal} onClose={() => setTermModal(null)} title={termModal ? `Thanh lý hợp đồng ${termModal.code}` : ''} size="sm">
-        {termModal && (
-          <form onSubmit={submitTerminate} className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Khi kết thúc hợp đồng, phòng <strong>{termModal.room_code}</strong> sẽ tự động chuyển về trạng thái <strong>Phòng trống</strong>.
-            </p>
-            <Input label="Ngày thanh lý" type="date" required value={termModal.ended_at} onChange={(e) => setTermModal({ ...termModal, ended_at: e.target.value })} />
-            <Textarea label="Lý do / ghi chú thanh lý" value={termModal.end_reason} onChange={(e) => setTermModal({ ...termModal, end_reason: e.target.value })} placeholder="Hết hạn hợp đồng, khách trả phòng..." />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setTermModal(null)}>Hủy</Button>
-              <Button type="submit" variant="danger" loading={saving}>Xác nhận kết thúc</Button>
-            </div>
-          </form>
-        )}
-      </Modal>
-
-      {/* Chi tiết */}
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail ? `Chi tiết hợp đồng ${detail.code}` : ''}>
-        {detail && (
-          <div className="space-y-3">
-            <InfoRow label="Mã hợp đồng">{detail.code}</InfoRow>
-            <InfoRow label="Trạng thái"><StatusBadge map={CONTRACT_STATUS} value={detail.status} /></InfoRow>
-            <InfoRow label="Phòng">Phòng {detail.room_code} (Tầng {detail.room_floor} • {detail.room_area} m²)</InfoRow>
-            <InfoRow label="Người thuê">{detail.tenant_name} — {detail.tenant_phone}</InfoRow>
-            <InfoRow label="CCCD">{detail.tenant_id_card || '—'}</InfoRow>
-            <InfoRow label="Số người ở">{detail.occupants} người</InfoRow>
-            <InfoRow label="Thời hạn">{date(detail.start_date)} → {date(detail.end_date)}</InfoRow>
-            <InfoRow label="Giá thuê hàng tháng">{money(detail.monthly_rent)}</InfoRow>
-            <InfoRow label="Tiền đặt cọc">{money(detail.deposit)}</InfoRow>
-            <InfoRow label="Ngày thanh toán">Ngày {detail.payment_day} hằng tháng</InfoRow>
-            {detail.ended_at && <InfoRow label="Ngày thanh lý">{date(detail.ended_at)} ({detail.end_reason || 'Không ghi lý do'})</InfoRow>}
-            {detail.terms && (
-              <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
-                <p className="mb-1 font-semibold text-slate-700">Điều khoản:</p>
-                {detail.terms}
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+      {/* Xem / Cập nhật / Gia hạn / Kết thúc trực tiếp trên Hợp đồng bản Word */}
+      {wordModal && (
+        <ContractWordModal
+          contract={wordModal.contract}
+          initialMode={wordModal.mode}
+          canEdit
+          onClose={() => setWordModal(null)}
+          onSaved={() => reload()}
+        />
+      )}
     </div>
   );
 }
