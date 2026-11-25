@@ -1,0 +1,23 @@
+databases:
+  - name: nha57-db
+    plan: free
+    databaseName: nha57
+    user: nha57_user
+
+services:
+  - type: web
+    name: nha57-giang-vo
+    runtime: node
+    plan: free
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nha57-db
+          property: connectionString

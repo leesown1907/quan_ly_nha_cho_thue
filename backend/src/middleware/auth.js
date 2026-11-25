@@ -1,7 +1,8 @@
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { query } from '../db/index.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'nha57-giangvo-secret-change-me';
+export const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export function signToken(user) {

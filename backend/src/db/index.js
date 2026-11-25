@@ -17,7 +17,12 @@ export let dbMode = 'unknown';
 export async function initDb() {
   if (process.env.DATABASE_URL) {
     pg.types.setTypeParser(DATE_OID, (v) => v); // giữ DATE dạng 'YYYY-MM-DD'
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+    const isLocal = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+    const pool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 10,
+      ssl: isLocal ? false : { rejectUnauthorized: false },
+    });
     impl = {
       query: (text, params) => pool.query(text, params),
       exec: (sql) => pool.query(sql),
